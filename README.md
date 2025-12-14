@@ -1,105 +1,60 @@
-# DeepSeek-OCR: PDF to Markdown Converter
+# DeepSeek-OCR: PDF to Markdown Converter (Ollama Backend)
 
-A powerful OCR solution that converts PDF documents to Markdown format using DeepSeek-OCR with FastAPI backend. This project provides both a batch processing script and a REST API for flexible document conversion.
+This repo now acts as a thin FastAPI wrapper that forwards OCR requests to your locally running DeepSeek-OCR model in Ollama (`deepseek-ocr:latest`). No bundled weights or GPU-specific vLLM stack are required in the container; the heavy lifting happens in your Ollama instance.
 
 ## 🚀 Quick Start
 
-### Option 1: Batch Processing with pdf_to_markdown_processor.py
+### Option 1: Run the API (Docker, talks to local Ollama)
 
-1. Place your PDF files in the `data/` directory
-2. Ensure the DeepSeek-OCR API is running (see Docker setup below)
-3. Run the processor:
+1) Make sure Ollama is running locally and the model is available:
+```bash
+ollama pull deepseek-ocr:latest
+```
+2) Start the API container (defaults to hitting `http://host.docker.internal:11434` for Ollama):
+```bash
+docker-compose up --build -d
+```
+3) Test it:
+```bash
+curl http://localhost:8000/health
+```
 
+### Option 2: Batch scripts against the API
+1) Place PDFs in `data/`
+2) Ensure the API above is running on `localhost:8000`
+3) Run a processor, e.g.:
 ```bash
 python pdf_to_markdown_processor.py
 ```
 
-### Option 2: REST API with Docker Backend
-
-1. Build and start the Docker container
-2. Use the API endpoints to process documents
-3. Integrate with your applications
-
 ---
 
 ## 📋 Prerequisites
-
-### Hardware Requirements
-- **NVIDIA GPU** with CUDA 11.8+ support
-- **GPU Memory**: Minimum 12GB VRAM (Model takes ~9GB)
-- **System RAM**: Minimum 32GB (recommended: 64GB+)
-- **Storage**: 50GB+ free space for model and containers
-
-### Software Requirements
-- **Python 3.8+** (for local processing)
-- **Docker** 20.10+ with GPU support
-- **Docker Compose** 2.0+
-- **NVIDIA Container Toolkit** installed
-- **CUDA 11.8** compatible drivers
+- Ollama installed locally and serving `deepseek-ocr:latest`
+- A GPU is strongly recommended because DeepSeek-OCR is heavy, but the API container itself is CPU-only; performance depends on your Ollama host hardware
+- Docker + Docker Compose (if you use the containerized API)
+- Python 3.8+ if you plan to run the helper scripts directly
 
 ---
 
-## 🐳 Docker Backend Setup
+## 🐳 Docker Backend Setup (Ollama Proxy)
 
-### 1. Download Model Weights
-
-Create a directory for model weights and download the DeepSeek-OCR model:
-
+1) Ensure Ollama is running locally with the model pulled:
 ```bash
-# Create models directory
-mkdir -p models
-
-# Download using Hugging Face CLI
-pip install huggingface_hub
-huggingface-cli download deepseek-ai/DeepSeek-OCR --local-dir models/deepseek-ai/DeepSeek-OCR
-
-# Or using git
-git clone https://huggingface.co/deepseek-ai/DeepSeek-OCR models/deepseek-ai/DeepSeek-OCR
+ollama pull deepseek-ocr:latest
+ollama serve   # or let the background service run
 ```
-
-### 2. Build and Run the Docker Container
-
-#### Windows Users
-
-```cmd
-REM Build the Docker image
-build.bat
-
-REM Start the service
-docker-compose up -d
-
-REM Check logs
-docker-compose logs -f deepseek-ocr
-```
-
-#### Linux/macOS Users
-
+2) If running Docker Desktop on macOS/Windows, the compose file defaults `OLLAMA_BASE_URL` to `http://host.docker.internal:11434`. On Linux, set it to your host IP:
 ```bash
-# Build the Docker image
-docker-compose build
-
-# Start the service
-docker-compose up -d
-
-# Check logs
-docker-compose logs -f deepseek-ocr
+export OLLAMA_BASE_URL=http://127.0.0.1:11434
+docker-compose up --build -d
 ```
-
-### 3. Verify Installation
-
+3) Verify:
 ```bash
-# Health check
 curl http://localhost:8000/health
-
-# Expected response:
-{
-  "status": "healthy",
-  "model_loaded": true,
-  "model_path": "/app/models/deepseek-ai/DeepSeek-OCR",
-  "cuda_available": true,
-  "cuda_device_count": 1
-}
 ```
+
+The API exposes `/ocr/image`, `/ocr/pdf`, and `/ocr/batch`, forwarding each request to your local Ollama model.
 
 ---
 
@@ -474,6 +429,8 @@ document.getElementById('fileInput').addEventListener('change', async (e) => {
 ---
 
 ## ⚙️ Configuration
+
+> Note: The sections below describe the original GPU/vLLM setup and custom file replacements. When running against Ollama, most of this is legacy and can be ignored unless you are reviving the old self-hosted model flow.
 
 ### Custom Configuration and Critical Fixes
 

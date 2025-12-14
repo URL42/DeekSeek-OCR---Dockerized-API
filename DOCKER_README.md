@@ -1,6 +1,8 @@
-# DeepSeek-OCR vLLM Docker Deployment
+# DeepSeek-OCR Docker Deployment (Ollama Proxy)
 
-This Docker setup provides a complete DeepSeek-OCR service with vLLM backend, ready for production use.
+This stack now runs a lightweight FastAPI container that forwards OCR requests to your locally running DeepSeek-OCR model in Ollama (`deepseek-ocr:latest`). The heavy model is **not** inside this image; make sure Ollama is running on the host.
+
+> The sections below were for the old GPU/vLLM image. Keep only the API usage examples; all GPU/model download steps are legacy.
 
 ## Prerequisites
 
@@ -143,34 +145,15 @@ curl -X POST "http://localhost:8000/ocr/batch" \
 }
 ```
 
-## Configuration
+## Configuration (current)
 
-### Environment Variables
-
-Edit `docker-compose.yml` to adjust these settings:
-
+Set these in `docker-compose.yml`:
 ```yaml
 environment:
-  - CUDA_VISIBLE_DEVICES=0                    # GPU device to use
-  - MODEL_PATH=/app/models/deepseek-ai/DeepSeek-OCR  # Model path
-  - MAX_CONCURRENCY=50                         # Max concurrent requests
-  - GPU_MEMORY_UTILIZATION=0.85                # GPU memory usage (0.1-1.0)
-```
-
-### Performance Tuning
-
-#### For High-Throughput Processing
-```yaml
-environment:
-  - MAX_CONCURRENCY=100
-  - GPU_MEMORY_UTILIZATION=0.95
-```
-
-#### For Memory-Constrained Systems
-```yaml
-environment:
-  - MAX_CONCURRENCY=10
-  - GPU_MEMORY_UTILIZATION=0.7
+  - OLLAMA_BASE_URL=http://host.docker.internal:11434   # adjust on Linux
+  - OLLAMA_MODEL=deepseek-ocr:latest
+  - DEFAULT_PROMPT=<image>\n<|grounding|>Convert the document to markdown.
+  - OLLAMA_TIMEOUT=120
 ```
 
 ## Advanced Usage

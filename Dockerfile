@@ -1,68 +1,30 @@
-# DeepSeek-OCR vLLM Docker Image
-# Based on official vLLM OpenAI image for better compatibility
+# Lightweight API image that proxies requests to a local Ollama-hosted DeepSeek-OCR model.
+FROM python:3.11-slim
 
-FROM vllm/vllm-openai:v0.8.5
-
-# Switch to root user to install packages
-USER root
-
-# Set working directory
 WORKDIR /app
 
-# Copy the DeepSeek-OCR vLLM implementation
-COPY DeepSeek-OCR/DeepSeek-OCR-master/DeepSeek-OCR-vllm/ ./DeepSeek-OCR-vllm/
+# System deps for Pillow/PyMuPDF
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libjpeg-dev \
+    zlib1g-dev \
+    libfreetype6-dev \
+    libpng-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy custom files to replace the originals (transparent replacement approach)
-COPY custom_config.py ./DeepSeek-OCR-vllm/config.py
-COPY custom_image_process.py ./DeepSeek-OCR-vllm/process/image_process.py
-COPY custom_deepseek_ocr.py ./DeepSeek-OCR-vllm/deepseek_ocr.py
+# Install Python dependencies
+RUN pip install --no-cache-dir \
+    fastapi==0.110.0 \
+    uvicorn[standard]==0.27.0 \
+    python-multipart==0.0.6 \
+    requests==2.31.0 \
+    Pillow==10.2.0 \
+    PyMuPDF==1.23.26 \
+    tqdm==4.66.1
 
-# Copy custom run scripts to replace the originals
-COPY custom_run_dpsk_ocr_pdf.py ./DeepSeek-OCR-vllm/run_dpsk_ocr_pdf.py
-COPY custom_run_dpsk_ocr_image.py ./DeepSeek-OCR-vllm/run_dpsk_ocr_image.py
-COPY custom_run_dpsk_ocr_eval_batch.py ./DeepSeek-OCR-vllm/run_dpsk_ocr_eval_batch.py
-
-# Copy the startup script
+# Copy application code
 COPY start_server.py .
 
-# Copy requirements file and install additional dependencies
-COPY DeepSeek-OCR/requirements.txt .
-
-# Install Python dependencies excluding conflicting packages
-RUN pip install --no-cache-dir \
-    PyMuPDF \
-    img2pdf \
-    einops \
-    easydict \
-    addict \
-    Pillow \
-    numpy
-
-# Install additional dependencies for the API server
-RUN pip install --no-cache-dir \
-    fastapi==0.104.1 \
-    uvicorn[standard]==0.24.0 \
-    python-multipart==0.0.6
-
-# Install flash-attn for optimal performance (if not already included)
-RUN pip install --no-cache-dir flash-attn==2.7.3 --no-build-isolation || echo "flash-attn may already be installed"
-
-# Downgrade tokenizers to compatible version if needed
-RUN pip install --no-cache-dir tokenizers==0.13.3 || echo "Using existing tokenizers version"
-
-# Add the DeepSeek-OCR directory to PYTHONPATH
-ENV PYTHONPATH="/app/DeepSeek-OCR-vllm:${PYTHONPATH}"
-
-# Create directories for outputs
-RUN mkdir -p /app/outputs
-
-# Make the scripts executable
-RUN chmod +x /app/start_server.py
-
-# Expose the API port
 EXPOSE 8000
 
-# Set the default command to use our custom server
-# Override the entrypoint to run our script directly
-# Use the full path to python to avoid PATH issues
-ENTRYPOINT ["/usr/bin/python3", "/app/start_server.py"]
+CMD ["uvicorn", "start_server:app", "--host", "0.0.0.0", "--port", "8000"]
