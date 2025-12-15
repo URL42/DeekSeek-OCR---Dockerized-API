@@ -56,6 +56,7 @@ class BatchOCRResponse(BaseModel):
     results: List[OCRResponse]
     total_pages: int
     filename: str
+    csv: Optional[str] = None
 
 def pdf_to_images_high_quality(pdf_data: bytes, dpi: int = 144) -> List[Image.Image]:
     """Convert PDF bytes to high-quality PIL Images"""
@@ -130,6 +131,62 @@ def process_single_image(image: Image.Image, prompt: str = DEFAULT_PROMPT) -> st
     print(f"[DEBUG] Ollama output length: {len(result)}")
     return result
 
+
+def coerce_bool(value: Optional[str]) -> bool:
+    """Convert form values to bool with lenient handling."""
+    if value is None:
+        return False
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def markdown_tables_to_csv(markdown_text: str) -> str:
+    """
+    Extract simple GitHub-style tables from markdown and return CSV text.
+    Tables are separated by a blank line in the CSV output.
+    """
+    import csv
+    lines = [line.strip() for line in markdown_text.splitlines()]
+    tables = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if "|" in line and i + 1 < len(lines) and "|" in lines[i + 1] and "-" in lines[i + 1]:
+            header_line = lines[i]
+            data_lines = []
+            i += 2
+            while i < len(lines) and "|" in lines[i] and lines[i].strip():
+                data_lines.append(lines[i])
+                i += 1
+
+            def parse_row(row_line: str) -> List[str]:
+                parts = [cell.strip() for cell in row_line.split("|")]
+                if parts and parts[0] == "":
+                    parts = parts[1:]
+                if parts and parts[-1] == "":
+                    parts = parts[:-1]
+                return parts
+
+            header = parse_row(header_line)
+            rows = [parse_row(dl) for dl in data_lines] if data_lines else []
+            if header:
+                tables.append([header] + rows)
+        else:
+            i += 1
+
+    if not tables:
+        return ""
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    for idx, table in enumerate(tables):
+        for row in table:
+            writer.writerow(row)
+        if idx != len(tables) - 1:
+            writer.writerow([])
+    return output.getvalue()
+
 @app.get("/")
 async def root():
     """Health check endpoint"""
@@ -198,7 +255,11 @@ async def process_image_endpoint(file: UploadFile = File(...), prompt: Optional[
         )
 
 @app.post("/ocr/pdf", response_model=BatchOCRResponse)
-async def process_pdf_endpoint(file: UploadFile = File(...), prompt: Optional[str] = Form(None)):
+async def process_pdf_endpoint(
+    file: UploadFile = File(...),
+    prompt: Optional[str] = Form(None),
+    as_csv: Optional[str] = Form(None),
+):
     """Process a PDF file with optional custom prompt"""
     try:
         print(f"[DEBUG] PDF endpoint called for file: {file.filename}")
@@ -226,6 +287,8 @@ async def process_pdf_endpoint(file: UploadFile = File(...), prompt: Optional[st
         use_prompt = prompt if prompt else DEFAULT_PROMPT
         print(f"[DEBUG] PDF endpoint selected prompt: {repr(use_prompt)}")
         print(f"[DEBUG] Using custom prompt: {prompt is not None}")
+        as_csv_flag = coerce_bool(as_csv)
+        print(f"[DEBUG] CSV conversion requested: {as_csv_flag}")
         
         # Process each page
         results = []
@@ -248,11 +311,19 @@ async def process_pdf_endpoint(file: UploadFile = File(...), prompt: Optional[st
                 ))
         
         print(f"[DEBUG] PDF processing complete: {len(results)} pages processed")
+        csv_content = None
+        if as_csv_flag:
+            combined_markdown = "\n\n".join(
+                r.result for r in results if r.success and r.result is not None
+            )
+            csv_content = markdown_tables_to_csv(combined_markdown)
+            print(f"[DEBUG] CSV extraction complete, length: {len(csv_content) if csv_content else 0}")
         return BatchOCRResponse(
             success=True,
             results=results,
             total_pages=len(images),
-            filename=file.filename
+            filename=file.filename,
+            csv=csv_content,
         )
         
     except Exception as e:

@@ -4,6 +4,12 @@ This stack now runs a lightweight FastAPI container that forwards OCR requests t
 
 > The sections below were for the old GPU/vLLM image. Keep only the API usage examples; all GPU/model download steps are legacy.
 
+### CSV toggle
+- `/ocr/pdf` accepts a form field `as_csv=true`; the response will include a `csv` field containing Markdown-table-to-CSV output (blank line between tables).
+
+### Interactive CLI helper
+- Use `python cli_ocr.py` to get prompted for API URL, file path, optional prompt, and CSV extraction (for PDFs) without crafting curl commands.
+
 ## Prerequisites
 
 ### Hardware Requirements

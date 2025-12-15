@@ -56,6 +56,12 @@ curl http://localhost:8000/health
 
 The API exposes `/ocr/image`, `/ocr/pdf`, and `/ocr/batch`, forwarding each request to your local Ollama model.
 
+### PDF to CSV toggle
+- The `/ocr/pdf` endpoint accepts `as_csv=true` (form field). When set, the API will parse simple Markdown tables from the OCR output and return a combined `csv` string field in the JSON response (tables separated by blank lines).
+
+### Simple interactive CLI
+- Run `python cli_ocr.py` for a guided prompt: enter API URL, pick a PDF/image path, optional custom prompt, and choose CSV extraction for PDFs. The script posts to the API and prints results (and CSV if requested).
+
 ---
 
 ## 📄 PDF Processing Scripts
