@@ -288,7 +288,7 @@ async def ui_page():
             }}
             if (parsed) {{
               if (parsed.results) {{
-                let combined = parsed.results.map(r => (r.page_count ? `Page ${r.page_count}:\\n` : '') + (r.result || r.error || '')).join('\\n\\n---\\n\\n');
+                let combined = parsed.results.map(r => (r.page_count ? `Page ${{r.page_count}}:\\n` : '') + (r.result || r.error || '')).join('\\n\\n---\\n\\n');
                 if (parsed.csv) {{
                   combined += "\\n\\n--- CSV ---\\n" + parsed.csv;
                 }}
