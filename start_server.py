@@ -12,7 +12,7 @@ from typing import List, Optional
 
 import uvicorn
 from fastapi import FastAPI, UploadFile, File, Form
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -191,6 +191,132 @@ def markdown_tables_to_csv(markdown_text: str) -> str:
 async def root():
     """Health check endpoint"""
     return {"message": "DeepSeek-OCR API is running", "status": "healthy"}
+
+@app.get("/ui", response_class=HTMLResponse)
+async def ui_page():
+    """Simple web UI for uploading PDFs/images and toggling CSV extraction."""
+    escaped_prompt = json.dumps(DEFAULT_PROMPT)
+    html = f"""
+    <!doctype html>
+    <html>
+    <head>
+      <meta charset="utf-8"/>
+      <title>DeepSeek OCR (Ollama)</title>
+      <style>
+        body {{
+          font-family: Arial, sans-serif;
+          max-width: 960px;
+          margin: 20px auto;
+          padding: 0 16px;
+          line-height: 1.4;
+        }}
+        textarea, input[type="text"] {{
+          width: 100%;
+          box-sizing: border-box;
+        }}
+        #output {{
+          white-space: pre-wrap;
+          background: #f5f5f5;
+          padding: 12px;
+          border-radius: 6px;
+          border: 1px solid #ddd;
+        }}
+        .row {{
+          margin-bottom: 12px;
+        }}
+        button {{
+          padding: 10px 16px;
+          font-size: 14px;
+        }}
+      </style>
+    </head>
+    <body>
+      <h2>DeepSeek OCR (Ollama-backed)</h2>
+      <div class="row">
+        <input id="file" type="file" accept=".pdf,image/*"/>
+      </div>
+      <div class="row">
+        <label for="prompt">Prompt (optional)</label><br/>
+        <textarea id="prompt" rows="3" placeholder="Leave empty for default prompt"></textarea>
+      </div>
+      <div class="row">
+        <label><input type="checkbox" id="asCsv" checked/> Extract CSV from markdown tables (PDF only)</label>
+      </div>
+      <div class="row">
+        <button onclick="runOCR()">Run OCR</button>
+      </div>
+      <div class="row">
+        <strong>Status:</strong> <span id="status">Idle</span>
+      </div>
+      <div class="row">
+        <h4>Output</h4>
+        <div id="output"></div>
+      </div>
+      <script>
+        const defaultPrompt = {escaped_prompt};
+
+        async function runOCR() {{
+          const fileInput = document.getElementById('file');
+          if (!fileInput.files.length) {{
+            alert('Select a PDF or image file first.');
+            return;
+          }}
+          const file = fileInput.files[0];
+          const prompt = document.getElementById('prompt').value || defaultPrompt;
+          const asCsv = document.getElementById('asCsv').checked;
+          const formData = new FormData();
+          formData.append('file', file);
+          if (prompt) formData.append('prompt', prompt);
+          let endpoint = '/ocr/image';
+          if (file.name.toLowerCase().endsWith('.pdf')) {{
+            endpoint = '/ocr/pdf';
+            if (asCsv) formData.append('as_csv', 'true');
+          }}
+          setStatus('Sending request...');
+          try {{
+            const resp = await fetch(endpoint, {{
+              method: 'POST',
+              body: formData
+            }});
+            const text = await resp.text();
+            let parsed;
+            try {{ parsed = JSON.parse(text); }} catch (e) {{}}
+            if (!resp.ok) {{
+              setOutput(text || 'Request failed');
+              setStatus('Error');
+              return;
+            }}
+            if (parsed) {{
+              if (parsed.results) {{
+                let combined = parsed.results.map(r => (r.page_count ? `Page ${r.page_count}:\\n` : '') + (r.result || r.error || '')).join('\\n\\n---\\n\\n');
+                if (parsed.csv) {{
+                  combined += "\\n\\n--- CSV ---\\n" + parsed.csv;
+                }}
+                setOutput(combined);
+              }} else {{
+                setOutput(parsed.result || parsed.error || text);
+              }}
+            }} else {{
+              setOutput(text);
+            }}
+            setStatus('Done');
+          }} catch (err) {{
+            setOutput('Error: ' + err);
+            setStatus('Error');
+          }}
+        }}
+
+        function setStatus(msg) {{
+          document.getElementById('status').textContent = msg;
+        }}
+        function setOutput(msg) {{
+          document.getElementById('output').textContent = msg;
+        }}
+      </script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html)
 
 @app.get("/health")
 async def health_check():

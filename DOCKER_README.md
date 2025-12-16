@@ -10,78 +10,22 @@ This stack now runs a lightweight FastAPI container that forwards OCR requests t
 ### Interactive CLI helper
 - Use `python cli_ocr.py` to get prompted for API URL, file path, optional prompt, and CSV extraction (for PDFs) without crafting curl commands.
 
-## Prerequisites
+## Quick Start (current)
 
-### Hardware Requirements
-- **NVIDIA GPU** with CUDA 11.8+ support
-- **GPU Memory**: Minimum 16GB VRAM (recommended: 40GB+ A100)
-- **System RAM**: Minimum 32GB (recommended: 64GB+)
-- **Storage**: 50GB+ free space for model and containers
-
-### Software Requirements
-- **Docker** 20.10+ with GPU support
-- **Docker Compose** 2.0+
-- **NVIDIA Container Toolkit** installed
-- **CUDA 11.8** compatible drivers
-
-## Quick Start
-
-### 1. Prepare Model Weights
-
-Create a directory for model weights and download the DeepSeek-OCR model:
-
+1) Ensure Ollama is running and has the model:
 ```bash
-mkdir -p models
-# Option 1: Using Hugging Face CLI
-pip install huggingface_hub
-huggingface-cli download deepseek-ai/DeepSeek-OCR --local-dir models/deepseek-ai/DeepSeek-OCR
-
-# Option 2: Using git
-git clone https://huggingface.co/deepseek-ai/DeepSeek-OCR models/deepseek-ai/DeepSeek-OCR
+ollama pull deepseek-ocr:latest
 ```
-
-### 2. Build and Run
-
-### Windows Users
-
-```cmd
-REM Build the Docker image
-build.bat
-
-REM Start the service
-docker-compose up -d
-
-REM Check logs
-docker-compose logs -f deepseek-ocr
-```
-
-### Linux/macOS Users
-
+2) Copy `.env.example` to `.env` and set:
+- `API_PORT` (host port, e.g., 8002)
+- `OLLAMA_BASE_URL` (e.g., `http://192.168.1.148:11434`)
+3) Start the API container:
 ```bash
-# Build the Docker image
-docker-compose build
-
-# Start the service
-docker-compose up -d
-
-# Check logs
-docker-compose logs -f deepseek-ocr
+docker-compose up --build -d
 ```
-
-### 3. Verify Installation
-
+4) Health check:
 ```bash
-# Health check
-curl http://localhost:8000/health
-
-# Should return something like:
-{
-  "status": "healthy",
-  "model_loaded": true,
-  "model_path": "/app/models/deepseek-ai/DeepSeek-OCR",
-  "cuda_available": true,
-  "cuda_device_count": 1
-}
+curl http://localhost:${API_PORT:-8000}/health
 ```
 
 ## API Usage

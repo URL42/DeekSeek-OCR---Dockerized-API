@@ -10,13 +10,17 @@ This repo now acts as a thin FastAPI wrapper that forwards OCR requests to your 
 ```bash
 ollama pull deepseek-ocr:latest
 ```
-2) Start the API container (defaults to hitting `http://host.docker.internal:11434` for Ollama):
+2) Copy `.env.example` to `.env` and adjust values (notably `API_PORT`, `OLLAMA_BASE_URL`):
+```bash
+cp .env.example .env
+```
+3) Start the API container (defaults to hitting `http://host.docker.internal:11434` for Ollama, API exposed on `${API_PORT:-8000}`):
 ```bash
 docker-compose up --build -d
 ```
-3) Test it:
+4) Test it:
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:${API_PORT:-8000}/health
 ```
 
 ### Option 2: Batch scripts against the API
@@ -44,14 +48,16 @@ python pdf_to_markdown_processor.py
 ollama pull deepseek-ocr:latest
 ollama serve   # or let the background service run
 ```
-2) If running Docker Desktop on macOS/Windows, the compose file defaults `OLLAMA_BASE_URL` to `http://host.docker.internal:11434`. On Linux, set it to your host IP:
+2) Copy `.env.example` to `.env` and set:
+   - `API_PORT` (host port, e.g., 8002)
+   - `OLLAMA_BASE_URL` (e.g., `http://192.168.1.148:11434`)
+3) If running Docker Desktop on macOS/Windows, `host.docker.internal` works for Ollama. On Linux, set `OLLAMA_BASE_URL` to your host IP:
 ```bash
-export OLLAMA_BASE_URL=http://127.0.0.1:11434
 docker-compose up --build -d
 ```
-3) Verify:
+4) Verify:
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:${API_PORT:-8000}/health
 ```
 
 The API exposes `/ocr/image`, `/ocr/pdf`, and `/ocr/batch`, forwarding each request to your local Ollama model.
@@ -60,7 +66,10 @@ The API exposes `/ocr/image`, `/ocr/pdf`, and `/ocr/batch`, forwarding each requ
 - The `/ocr/pdf` endpoint accepts `as_csv=true` (form field). When set, the API will parse simple Markdown tables from the OCR output and return a combined `csv` string field in the JSON response (tables separated by blank lines).
 
 ### Simple interactive CLI
-- Run `python cli_ocr.py` for a guided prompt: enter API URL, pick a PDF/image path, optional custom prompt, and choose CSV extraction for PDFs. The script posts to the API and prints results (and CSV if requested).
+- Run `python cli_ocr.py` for a guided prompt: it auto-uses `OCR_API_BASE` or `API_PORT` (default `http://localhost:8000`), then prompts for a file path, optional custom prompt, and CSV extraction for PDFs. The script posts to the API and prints results (and CSV if requested).
+
+### Simple web UI
+- Visit `/ui` (e.g., `http://localhost:${API_PORT:-8000}/ui`) for a browser-based form to upload a PDF/image, set a prompt, and toggle CSV extraction (PDF only). Results render inline.
 
 ---
 

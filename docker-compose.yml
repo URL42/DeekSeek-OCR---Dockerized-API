@@ -3,13 +3,15 @@ services:
     build: .
     container_name: deepseek-ocr-ollama
     ports:
-      - "8000:8000"
+      - "${API_PORT:-8000}:8000"
+    env_file:
+      - .env
     environment:
       # Point to your local Ollama instance. On macOS/Windows Docker Desktop, host.docker.internal works.
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
-      - OLLAMA_MODEL=deepseek-ocr:latest
-      - DEFAULT_PROMPT=<image>\n<|grounding|>Convert the document to markdown.
-      - OLLAMA_TIMEOUT=120
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-deepseek-ocr:latest}
+      - DEFAULT_PROMPT=${DEFAULT_PROMPT:-<image>\n<|grounding|>Convert the document to markdown.}
+      - OLLAMA_TIMEOUT=${OLLAMA_TIMEOUT:-120}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]

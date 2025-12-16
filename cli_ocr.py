@@ -9,7 +9,9 @@ import sys
 import pathlib
 import requests
 
-DEFAULT_API = os.environ.get("OCR_API_BASE", "http://localhost:8000")
+def default_api_base() -> str:
+    port = os.environ.get("API_PORT", "8000")
+    return os.environ.get("OCR_API_BASE", f"http://localhost:{port}")
 
 
 def prompt(text: str, default: str | None = None) -> str:
@@ -74,7 +76,8 @@ def process_file(api_base: str, path: pathlib.Path, prompt_text: str, as_csv: bo
 
 
 def main() -> int:
-    api_base = prompt("API base URL", DEFAULT_API)
+    api_base = default_api_base()
+    print(f"Using API base: {api_base}")
     path = choose_file()
     prompt_text = prompt("Custom prompt (leave blank for default)", "")
     as_csv = False
