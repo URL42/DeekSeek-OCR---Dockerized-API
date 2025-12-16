@@ -28,6 +28,7 @@ DEFAULT_PROMPT = os.environ.get("DEFAULT_PROMPT", "<image>\n<|grounding|>Convert
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "deepseek-ocr:latest")
 OLLAMA_TIMEOUT = float(os.environ.get("OLLAMA_TIMEOUT", "120"))
+OUTPUT_DIR = os.environ.get("OUTPUT_DIR", "outputs")
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -187,6 +188,37 @@ def markdown_tables_to_csv(markdown_text: str) -> str:
             writer.writerow([])
     return output.getvalue()
 
+
+def ensure_output_dir() -> str:
+    """Create and return the output directory path."""
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    return OUTPUT_DIR
+
+
+def combine_markdown_from_results(results: List[OCRResponse]) -> str:
+    """Combine per-page markdown results into a single string with separators."""
+    parts = []
+    for item in results:
+        if not isinstance(item, OCRResponse):
+            continue
+        label = f"Page {item.page_count}:\n" if item.page_count else ""
+        content = item.result or item.error or ""
+        if content:
+            parts.append(f"{label}{content}")
+    return "\n\n---\n\n".join(parts)
+
+
+def save_outputs(base_name: str, markdown_text: str, csv_text: Optional[str] = None):
+    """Save markdown and optional CSV to the outputs directory."""
+    out_dir = ensure_output_dir()
+    md_path = Path(out_dir) / f"{base_name}.md"
+    with open(md_path, "w", encoding="utf-8") as f:
+        f.write(markdown_text)
+    if csv_text:
+        csv_path = Path(out_dir) / f"{base_name}.csv"
+        with open(csv_path, "w", encoding="utf-8") as f:
+            f.write(csv_text)
+
 @app.get("/")
 async def root():
     """Health check endpoint"""
@@ -243,6 +275,9 @@ async def ui_page():
         <label><input type="checkbox" id="asCsv" checked/> Extract CSV from markdown tables (PDF only)</label>
       </div>
       <div class="row">
+        <label><input type="checkbox" id="saveOutput" checked/> Save output to server outputs folder</label>
+      </div>
+      <div class="row">
         <button onclick="runOCR()">Run OCR</button>
       </div>
       <div class="row">
@@ -264,9 +299,11 @@ async def ui_page():
           const file = fileInput.files[0];
           const prompt = document.getElementById('prompt').value || defaultPrompt;
           const asCsv = document.getElementById('asCsv').checked;
+          const saveOutput = document.getElementById('saveOutput').checked;
           const formData = new FormData();
           formData.append('file', file);
           if (prompt) formData.append('prompt', prompt);
+          if (saveOutput) formData.append('save', 'true');
           let endpoint = '/ocr/image';
           if (file.name.toLowerCase().endsWith('.pdf')) {{
             endpoint = '/ocr/pdf';
@@ -340,7 +377,11 @@ async def health_check():
     }
 
 @app.post("/ocr/image", response_model=OCRResponse)
-async def process_image_endpoint(file: UploadFile = File(...), prompt: Optional[str] = Form(None)):
+async def process_image_endpoint(
+    file: UploadFile = File(...),
+    prompt: Optional[str] = Form(None),
+    save: Optional[str] = Form(None),
+):
     """Process a single image file with optional custom prompt"""
     try:
         print(f"[DEBUG] Image endpoint called for file: {file.filename}")
@@ -366,6 +407,11 @@ async def process_image_endpoint(file: UploadFile = File(...), prompt: Optional[
         print(f"[DEBUG] Sending image to DeepSeek-OCR via Ollama...")
         result = process_single_image(image, use_prompt)
         print(f"[DEBUG] OCR complete, output length: {len(result)}")
+        save_flag = coerce_bool(save)
+        if save_flag and result:
+            base_name = Path(file.filename).stem
+            save_outputs(base_name, result, None)
+            print(f"[DEBUG] Saved output for {base_name} in {OUTPUT_DIR}")
         
         return OCRResponse(
             success=True,
@@ -385,6 +431,7 @@ async def process_pdf_endpoint(
     file: UploadFile = File(...),
     prompt: Optional[str] = Form(None),
     as_csv: Optional[str] = Form(None),
+    save: Optional[str] = Form(None),
 ):
     """Process a PDF file with optional custom prompt"""
     try:
@@ -415,6 +462,8 @@ async def process_pdf_endpoint(
         print(f"[DEBUG] Using custom prompt: {prompt is not None}")
         as_csv_flag = coerce_bool(as_csv)
         print(f"[DEBUG] CSV conversion requested: {as_csv_flag}")
+        save_flag = coerce_bool(save)
+        print(f"[DEBUG] Save requested: {save_flag}")
         
         # Process each page
         results = []
@@ -438,12 +487,18 @@ async def process_pdf_endpoint(
         
         print(f"[DEBUG] PDF processing complete: {len(results)} pages processed")
         csv_content = None
+        csv_content = None
         if as_csv_flag:
             combined_markdown = "\n\n".join(
                 r.result for r in results if r.success and r.result is not None
             )
             csv_content = markdown_tables_to_csv(combined_markdown)
             print(f"[DEBUG] CSV extraction complete, length: {len(csv_content) if csv_content else 0}")
+        combined_for_save = combine_markdown_from_results(results)
+        if save_flag and combined_for_save:
+            base_name = Path(file.filename).stem
+            save_outputs(base_name, combined_for_save, csv_content)
+            print(f"[DEBUG] Saved outputs for {base_name} in {OUTPUT_DIR}")
         return BatchOCRResponse(
             success=True,
             results=results,

@@ -10,6 +10,9 @@ This stack now runs a lightweight FastAPI container that forwards OCR requests t
 ### Interactive CLI helper
 - Use `python cli_ocr.py` to get prompted for API URL, file path, optional prompt, and CSV extraction (for PDFs) without crafting curl commands.
 
+### Output saving
+- `/ui` sends `save=true` by default and the server writes results to `OUTPUT_DIR` (default `outputs/`) as `.md`, plus `.csv` when CSV is requested on PDFs.
+
 ## Quick Start (current)
 
 1) Ensure Ollama is running and has the model:
