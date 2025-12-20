@@ -71,6 +71,9 @@ The API exposes `/ocr/image`, `/ocr/pdf`, and `/ocr/batch`, forwarding each requ
 ### Simple web UI
 - Visit `/ui` (e.g., `http://localhost:${API_PORT:-8000}/ui`) for a browser-based form to upload a PDF/image, set a prompt, and toggle CSV extraction (PDF only). Results render inline and, by default, are saved on the server in `OUTPUT_DIR` (defaults to `outputs/`) as `.md` and `.csv` (for PDF+CSV).
 
+### Where outputs are saved
+- The API writes files to `OUTPUT_DIR` (default `outputs/`). docker-compose mounts `./outputs` from the host to `/app/outputs` in the container so you can access them on the host.
+
 ---
 
 ## 📄 PDF Processing Scripts

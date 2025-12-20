@@ -11,7 +11,7 @@ This stack now runs a lightweight FastAPI container that forwards OCR requests t
 - Use `python cli_ocr.py` to get prompted for API URL, file path, optional prompt, and CSV extraction (for PDFs) without crafting curl commands.
 
 ### Output saving
-- `/ui` sends `save=true` by default and the server writes results to `OUTPUT_DIR` (default `outputs/`) as `.md`, plus `.csv` when CSV is requested on PDFs.
+- `/ui` sends `save=true` by default and the server writes results to `OUTPUT_DIR` (default `outputs/`) as `.md`, plus `.csv` when CSV is requested on PDFs. The compose file binds `./outputs` on the host to `/app/outputs` in the container so you can access saved files from the host.
 
 ## Quick Start (current)
 

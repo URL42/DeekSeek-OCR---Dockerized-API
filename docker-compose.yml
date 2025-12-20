@@ -6,6 +6,8 @@ services:
       - "${API_PORT:-8000}:8000"
     env_file:
       - .env
+    volumes:
+      - ./outputs:/app/outputs
     environment:
       # Point to your local Ollama instance. On macOS/Windows Docker Desktop, host.docker.internal works.
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
